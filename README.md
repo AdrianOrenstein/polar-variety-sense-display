@@ -1,43 +1,59 @@
 # polar-display
 
-**polar-display** is a Python program that reads data from a Polar H10 heart rate sensor, broadcasts the data via WebSocket, and displays it on a webpage as ECG and ACC charts. This program uses the [polar-python](https://github.com/zHElEARN/polar-python) library to interact with the Polar H10 device.
+Real-time biometric dashboard for **Polar Verity Sense** optical heart rate sensor. Streams PPG (photoplethysmography), accelerometer, gyroscope, and heart rate data via WebSocket to an interactive web interface with live signal processing and BPM estimation.
 
-## Prerequisites
+![Dashboard](https://img.shields.io/badge/Python-3.14-blue.svg) ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
--   Python 3.6+
--   Polar H10 heart rate sensor
+## Demo
+
+https://github.com/user-attachments/assets/bf3000d3-d294-4421-9aee-70d0376f0888
 
 ## Installation
 
-1. Clone the repository:
+```bash
+# Clone repository
+git clone https://github.com/adrianorenstein/polar-web.git
+cd polar-web
 
-    ```bash
-    git clone https://github.com/zHElEARN/polar-display.git
-    cd polar-display
-    ```
+# Setup Python environment and install dependencies
+make venv
 
-2. Install the `polar-python` library:
-
-    ```bash
-    pip install polar-python
-    ```
+# Run server (auto-opens browser)
+make run
+```
 
 ## Usage
 
-1. Ensure your Polar H10 device is on and nearby.
+1. **Power on** your Polar Verity Sense device
+2. **Run server**: `make run` or `python server.py`
+3. **Browser**: Dashboard auto-opens at `http://localhost:8766`
+4. **Connect**: Server scans and automatically connects to the Polar device
 
-2. Run the server:
+The server will:
+- Scan for Bluetooth devices matching "Polar Sense"
+- Establish connection and subscribe to PPG, HR, ACC, GYRO streams
+- Process PPG data every 1 second (requires ≥4 sec buffer)
 
-    ```bash
-    python server.py
-    ```
+**Stop server**: `Ctrl+C`
 
-3. Open your web browser and navigate to `http://localhost:8080` to see the real-time ECG and ACC charts.
+## Architecture
 
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
+```
+Polar Verity Sense (BLE, 55 Hz PPG)
+    ↓
+server.py (Python asyncio)
+    ├─ Bleak (BLE client)
+    ├─ pypg (signal processing)
+    │   └─ Chebyshev II bandpass → peak detection → BPM
+    ├─ WebSocket server (port 8765)
+    └─ HTTP server (port 8766)
+        ↓
+web/index.html + charts.js
+    └─ Real-time Canvas rendering
+```
 
 ## Acknowledgements
 
--   [polar-python](https://pypi.org/project/polar-python/): Library for interacting with Polar H10 devices
+- [Polar Verity Sense](https://www.polar.com/us-en/sensors/verity-sense) - Optical HR sensor
+- [polar-python](https://github.com/zHElEARN/polar-python) - Polar device BLE library
+- [pypg](https://github.com/hpi-dhc/pypg) - PPG signal processing toolkit

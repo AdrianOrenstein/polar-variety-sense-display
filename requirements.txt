@@ -1,0 +1,8 @@
+pypg @ git+https://github.com/hpi-dhc/pypg.git
+nolds
+websockets
+aiohttp
+rich
+bleak
+python-osc
+polar-python

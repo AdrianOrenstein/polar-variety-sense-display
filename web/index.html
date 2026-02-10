@@ -3,12 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Polar Display</title>
+    <title>Polar Verity Sense</title>
     <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
         font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 0;
         background-color: #121212;
         color: #e0e0e0;
         height: 100vh;
@@ -16,248 +15,330 @@
         display: flex;
         flex-direction: column;
       }
-      .chart-container {
-        flex: 1;
+
+      /* ── top bar ── */
+      .top-bar {
         display: flex;
-        flex-direction: row;
-        background-color: #1e1e1e;
-        padding: 10px;
-        box-sizing: border-box;
-        position: relative;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 16px;
+        background: #1a1a1a;
         border-bottom: 1px solid #333;
+        flex-shrink: 0;
       }
-      .chart-title {
-        margin: 0;
-        color: #bbbbbb;
-        font-size: 16px;
-        position: absolute;
-        top: 10px;
-        left: 0;
-        right: 0;
-        text-align: center;
-        z-index: 2;
+      .top-bar h1 { font-size: 14px; color: #bbb; font-weight: 500; }
+      .status-badge {
+        padding: 3px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
       }
-      .chart-wrapper {
-        position: relative;
-        width: calc(100% - 120px);
+      .connected   { background: #1b5e20; color: #a5d6a7; }
+      .disconnected { background: #b71c1c; color: #ef9a9a; }
+
+      /* ── stats ribbon ── */
+      .stats-ribbon {
+        display: flex;
+        gap: 20px;
+        padding: 6px 16px;
+        background: #1e1e1e;
+        border-bottom: 1px solid #333;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .stat { display: flex; flex-direction: column; }
+      .stat-label { font-size: 10px; color: #777; text-transform: uppercase; letter-spacing: 0.5px; }
+      .stat-value { font-size: 18px; font-weight: bold; }
+
+      /* ── chart panels 2×2 grid ── */
+      .panels {
         flex: 1;
-      }
-      .status {
-        position: fixed;
-        top: 50%;
-        transform: translateY(-50%);
-        right: 10px;
-        padding: 8px 12px;
-        border-radius: 3px;
-        font-size: 14px;
-        z-index: 10;
-      }
-      .connected {
-        background-color: #1b5e20;
-        color: white;
-      }
-      .disconnected {
-        background-color: #b71c1c;
-        color: white;
-      }
-      .info-panel {
-        width: 160px;
-        background-color: rgba(30, 30, 30, 0.7);
-        border-left: 1px solid #333;
-        margin-left: 10px;
-        padding: 10px;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
-        box-sizing: border-box;
-      }
-      .info-item {
-        margin-bottom: 15px;
-        display: flex;
-        flex-direction: column;
-      }
-      .info-label {
-        color: #999;
-        font-size: 18px; /* 增大标签字体 */
-        margin-bottom: 6px;
-      }
-      .info-value {
-        font-size: 28px; /* 增大值字体 */
-        font-weight: bold;
-      }
-      .heart-rate {
-        color: #ff5252;
-      }
-      .ecg-value {
-        color: #00e676;
-      }
-      .acc-x {
-        color: #ff9e80;
-      }
-      .acc-y {
-        color: #80d8ff;
-      }
-      .acc-z {
-        color: #b388ff;
-      }
-      .rr-intervals {
-        max-height: 100px;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-top: 5px;
-        scrollbar-width: thin;
-        scrollbar-color: #555 #333;
-        font-size: 24px;
-      }
-      .rr-intervals::-webkit-scrollbar {
-        width: 6px;
-      }
-      .rr-intervals::-webkit-scrollbar-track {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 1px;
         background: #333;
-        border-radius: 4px;
+        min-height: 0;
       }
-      .rr-intervals::-webkit-scrollbar-thumb {
-        background-color: #555;
-        border-radius: 4px;
+      .panel {
+        background: #1e1e1e;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
       }
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 12px;
+        flex-shrink: 0;
+      }
+      .panel-title {
+        font-size: 11px;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .panel-legend {
+        display: flex;
+        gap: 10px;
+        font-size: 10px;
+      }
+      .legend-item { display: flex; align-items: center; gap: 3px; }
+      .legend-dot  { width: 7px; height: 7px; border-radius: 50%; }
+      .chart-area  { flex: 1; min-height: 0; position: relative; }
+
+      /* ── PPI strip ── */
+      .ppi-strip {
+        display: flex;
+        gap: 6px;
+        padding: 3px 12px;
+        flex-shrink: 0;
+        overflow-x: auto;
+        background: #1a1a1a;
+        border-top: 1px solid #333;
+        scrollbar-width: none;
+        min-height: 22px;
+      }
+      .ppi-strip::-webkit-scrollbar { display: none; }
+      .ppi-pill {
+        background: #2a2a2a;
+        padding: 1px 8px;
+        border-radius: 8px;
+        font-size: 11px;
+        color: #aaa;
+        white-space: nowrap;
+      }
+
+      /* color helpers */
+      .c-red    { color: #ff5252; }
+      .c-green  { color: #69f0ae; }
+      .c-blue   { color: #40c4ff; }
+      .c-orange { color: #ffab40; }
+      .c-pink   { color: #ea80fc; }
+      .c-cyan   { color: #84ffff; }
+      .c-lime   { color: #ccff90; }
+      .c-acc-r  { color: #ff9e80; }
+      .c-acc-b  { color: #80d8ff; }
+      .c-acc-p  { color: #b388ff; }
     </style>
   </head>
   <body>
-    <div id="status" class="status disconnected">Disconnected</div>
+    <!-- ── Top Bar ── -->
+    <div class="top-bar">
+      <h1>Polar Verity Sense Dashboard</h1>
+      <span id="status" class="status-badge disconnected">Disconnected</span>
+    </div>
 
-    <div class="chart-container">
-      <h2 class="chart-title">ECG Monitor (μV)</h2>
-      <div id="ecg-chart" class="chart-wrapper"></div>
-      <div class="info-panel">
-        <div class="info-item">
-          <span class="info-label">Heart Rate</span>
-          <span id="heart-rate" class="info-value heart-rate">--</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">ECG Value</span>
-          <span id="ecg-value" class="info-value ecg-value">--</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">RR Intervals</span>
-          <div id="rr-intervals" class="rr-intervals">--</div>
-        </div>
+    <!-- ── Stats Ribbon ── -->
+    <div class="stats-ribbon">
+      <div class="stat">
+        <span class="stat-label">Heart Rate</span>
+        <span id="hr-val" class="stat-value c-red">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">RR Interval</span>
+        <span id="rr-val" class="stat-value" style="color:#ce93d8;">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">PPG BPM</span>
+        <span id="ppg-bpm" class="stat-value c-red" style="font-size:14px;">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">PPG Ch0</span>
+        <span id="ppg-ch0" class="stat-value c-red" style="font-size:14px;">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">PPG Ch1</span>
+        <span id="ppg-ch1" class="stat-value c-green" style="font-size:14px;">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">ACC Magnitude</span>
+        <span id="acc-mag" class="stat-value c-acc-r" style="font-size:14px;">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Gyro Magnitude</span>
+        <span id="gyro-mag" class="stat-value c-pink" style="font-size:14px;">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">MAG Magnitude</span>
+        <span id="mag-mag" class="stat-value" style="font-size:14px; color:#ffd740;">--</span>
       </div>
     </div>
 
-    <div class="chart-container">
-      <h2 class="chart-title">Accelerometer (mG)</h2>
-      <div id="acc-chart" class="chart-wrapper"></div>
-      <div class="info-panel">
-        <div class="info-item">
-          <span class="info-label">X-Axis</span>
-          <span id="acc-x" class="info-value acc-x">--</span>
+    <!-- ── Chart Panels (2×2) ── -->
+    <div class="panels">
+      <!-- PPG -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">PPG (filtered)</span>
+          <div class="panel-legend">
+            <span class="legend-item"><span class="legend-dot" style="background:#ff5252"></span>ch0</span>
+          </div>
         </div>
-        <div class="info-item">
-          <span class="info-label">Y-Axis</span>
-          <span id="acc-y" class="info-value acc-y">--</span>
+        <div id="ppg-chart" class="chart-area"></div>
+      </div>
+
+      <!-- HR Timeline -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Heart Rate (BPM)</span>
         </div>
-        <div class="info-item">
-          <span class="info-label">Z-Axis</span>
-          <span id="acc-z" class="info-value acc-z">--</span>
+        <div id="hr-chart" class="chart-area"></div>
+      </div>
+
+      <!-- ACC -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Accelerometer (mG)</span>
+          <div class="panel-legend">
+            <span class="legend-item"><span class="legend-dot" style="background:#ff9e80"></span>X</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#80d8ff"></span>Y</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#b388ff"></span>Z</span>
+          </div>
         </div>
+        <div id="acc-chart" class="chart-area"></div>
+      </div>
+
+      <!-- Gyro -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Motion Sensors</span>
+          <div class="panel-legend">
+            <span class="legend-item"><span class="legend-dot" style="background:#ea80fc"></span>ACC</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#84ffff"></span>Gyro</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#ffd740"></span>MAG</span>
+          </div>
+        </div>
+        <div id="gyro-chart" class="chart-area"></div>
       </div>
     </div>
+
+    <!-- PPI strip at bottom -->
+    <div id="ppi-strip" class="ppi-strip"></div>
 
     <script src="utils.js"></script>
     <script src="charts.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        // 初始化图表
-        const ecgChart = new ECGChart(
-          document.getElementById("ecg-chart"),
-          [],
-          window.innerHeight / 2 - 30
-        );
+        // Derive chart height from actual panel size
+        function panelH() {
+          const el = document.querySelector(".chart-area");
+          return el ? el.clientHeight : 250;
+        }
 
-        const accChart = new ACCChart(
-          document.getElementById("acc-chart"),
-          [],
-          window.innerHeight / 2 - 30,
-          25,
-          2
-        );
+        const h = panelH();
+        const ppgChart  = new FilteredPPGChart(document.getElementById("ppg-chart"), [], h);
+        const accChart  = new ACCChart(document.getElementById("acc-chart"), [], h, 52, 2);
+        const motionChart = new MotionMagnitudeChart(document.getElementById("gyro-chart"), [], h);
+        const hrChart   = new HRTimelineChart(document.getElementById("hr-chart"), h);
 
-        // 获取信息面板元素
-        const heartRateElement = document.getElementById("heart-rate");
-        const rrIntervalsElement = document.getElementById("rr-intervals"); // 改为复数
-        const ecgValueElement = document.getElementById("ecg-value");
-        const accXElement = document.getElementById("acc-x");
-        const accYElement = document.getElementById("acc-y");
-        const accZElement = document.getElementById("acc-z");
+        // Value display elements
+        const hrValEl    = document.getElementById("hr-val");
+        const rrValEl    = document.getElementById("rr-val");
+        const ppgBpmEl   = document.getElementById("ppg-bpm");
+        const ppgCh0El   = document.getElementById("ppg-ch0");
+        const ppgCh1El   = document.getElementById("ppg-ch1");
+        const accMagEl = document.getElementById("acc-mag");
+        const gyroMagEl = document.getElementById("gyro-mag");
+        const magMagEl = document.getElementById("mag-mag");
+        const ppiStripEl = document.getElementById("ppi-strip");
 
-        // 处理窗口大小改变
-        window.addEventListener('resize', () => {
-          if (ecgChart.chart && typeof ecgChart.chart.updateHeight === 'function') {
-            ecgChart.chart.updateHeight(window.innerHeight / 2 - 30);
-          }
-          
-          if (accChart.chart && typeof accChart.chart.updateHeight === 'function') {
-            accChart.chart.updateHeight(window.innerHeight / 2 - 30);
-          }
+        // Resize handler
+        window.addEventListener("resize", () => {
+          const nh = panelH();
+          ppgChart.updateHeight(nh);
+          accChart.chart.updateHeight(nh);
+          motionChart.updateHeight(nh);
+          hrChart.updateHeight(nh);
         });
 
-        // WebSocket连接
+        // ── WebSocket ──
+        const statusEl = document.getElementById("status");
         let ws = null;
-        const statusElement = document.getElementById("status");
 
         function connectWebSocket() {
           ws = new WebSocket("ws://127.0.0.1:8765/");
 
           ws.onopen = () => {
-            statusElement.textContent = "Connected";
-            statusElement.className = "status connected";
-            console.log("WebSocket connected");
+            statusEl.textContent = "Connected";
+            statusEl.className = "status-badge connected";
           };
 
           ws.onmessage = (event) => {
             try {
-              const message = JSON.parse(event.data);
+              const msg = JSON.parse(event.data);
 
-              if (message.type === "ecg" && message.data && Array.isArray(message.data.data)) {
-                // 更新ECG图表
-                ecgChart.updateData(message.data.data);
-                
-                // 更新ECG值显示
-                if (message.data.data.length > 0) {
-                  ecgValueElement.textContent = `${message.data.data[0]} μV`;
+              if (msg.type === "ppg_processed" && msg.data && Array.isArray(msg.data.values)) {
+                const fmt = msg.data.values.map(v => ({ v }));
+                const peaks = msg.data.peaks || [];
+                ppgChart.updateData(fmt, peaks);
+                if (msg.data.bpm !== null && msg.data.bpm !== undefined) {
+                  ppgBpmEl.textContent = `${msg.data.bpm} BPM`;
                 }
-              } 
-              else if (message.type === "acc" && message.data && Array.isArray(message.data.data)) {
-                // 转换加速度数据格式
-                const formattedData = message.data.data.map((point) => ({
-                  x: point[0],
-                  y: point[1],
-                  z: point[2],
-                }));
-                
-                // 更新加速度图表
-                accChart.updateData(formattedData);
-                
-                // 更新加速度值显示
-                if (formattedData.length > 0) {
-                  const firstPoint = formattedData[0];
-                  accXElement.textContent = `${firstPoint.x} mG`;
-                  accYElement.textContent = `${firstPoint.y} mG`;
-                  accZElement.textContent = `${firstPoint.z} mG`;
+                // Display RR intervals from PPG
+                if (msg.data.rr_intervals && msg.data.rr_intervals.length > 0) {
+                  const avgRR = msg.data.rr_intervals.reduce((a, b) => a + b, 0) / msg.data.rr_intervals.length;
+                  rrValEl.textContent = `${Math.round(avgRR)} ms`;
+                  
+                  // Add RR interval pills to strip
+                  msg.data.rr_intervals.forEach(rr => {
+                    const pill = document.createElement("div");
+                    pill.className = "ppi-pill";
+                    pill.textContent = `${rr}`;
+                    ppiStripEl.appendChild(pill);
+                  });
+                  // Keep only last 20 pills
+                  while (ppiStripEl.children.length > 20) {
+                    ppiStripEl.removeChild(ppiStripEl.firstChild);
+                  }
                 }
               }
-              else if (message.type === "heartrate" && message.data) {
-                // 更新心率显示
-                if (message.data.heartrate) {
-                  heartRateElement.textContent = `${message.data.heartrate} BPM`;
+              else if (msg.type === "ppg" && msg.data && Array.isArray(msg.data.samples)) {
+                const fmt = msg.data.samples.map(s => ({
+                  ch0: s[0], ch1: s[1], ch2: s[2], ch3: s[3]
+                }));
+                if (fmt.length > 0) {
+                  const last = fmt[fmt.length - 1];
+                  ppgCh0El.textContent = last.ch0.toLocaleString();
+                  ppgCh1El.textContent = last.ch1.toLocaleString();
                 }
-                
-                // 更新所有RR间隔显示
-                if (message.data.rr_intervals && message.data.rr_intervals.length > 0) {
-                  const firstInterval = message.data.rr_intervals[0];
-                  rrIntervalsElement.textContent = `${Math.round(firstInterval)} ms`;
+              }
+              else if (msg.type === "acc" && msg.data && Array.isArray(msg.data.data)) {
+                const fmt = msg.data.data.map(p => ({ x: p[0], y: p[1], z: p[2] }));
+                accChart.updateData(fmt);
+                if (msg.data.magnitude !== undefined) {
+                  accMagEl.textContent = `${msg.data.magnitude.toFixed(1)} mg`;
+                  // Add to motion chart
+                  motionChart.addAccMagnitude(msg.data.magnitude);
+                }
+              }
+              else if (msg.type === "gyro" && msg.data && Array.isArray(msg.data.data)) {
+                const fmt = msg.data.data.map(p => ({ x: p[0], y: p[1], z: p[2] }));
+                // Still update individual axis chart if needed, but focus on magnitude
+                if (msg.data.magnitude !== undefined) {
+                  console.log("GYRO magnitude:", msg.data.magnitude, "Raw data:", msg.data.data);
+                  gyroMagEl.textContent = `${msg.data.magnitude.toFixed(1)} °/s`;
+                  // Add to motion chart
+                  motionChart.addGyroMagnitude(msg.data.magnitude);
+                }
+              }
+              else if (msg.type === "mag" && msg.data && Array.isArray(msg.data.data)) {
+                if (msg.data.magnitude !== undefined) {
+                  // Convert from nT to µT for display
+                  const magUT = msg.data.magnitude / 1000;
+                  magMagEl.textContent = `${magUT.toFixed(1)} µT`;
+                  // Add to motion chart
+                  motionChart.addMagMagnitude(magUT);
+                }
+              }
+              else if (msg.type === "heartrate" && msg.data) {
+                if (msg.data.heartrate && msg.data.heartrate > 0) {
+                  const bpm = msg.data.heartrate;
+                  hrValEl.textContent = `${bpm} BPM`;
+                  hrChart.addHR(bpm);
                 }
               }
             } catch (error) {
@@ -266,9 +347,8 @@
           };
 
           ws.onclose = () => {
-            statusElement.textContent = "Disconnected";
-            statusElement.className = "status disconnected";
-            console.log("WebSocket disconnected, trying to reconnect...");
+            statusEl.textContent = "Disconnected";
+            statusEl.className = "status-badge disconnected";
             setTimeout(connectWebSocket, 2000);
           };
 
@@ -278,7 +358,6 @@
           };
         }
 
-        // 初始连接
         connectWebSocket();
       });
     </script>

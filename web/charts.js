@@ -335,47 +335,149 @@ class MonitorChart {
 }
 
 /**
- * ECG图表
+ * PPG Chart – 4 channels from Polar Verity Sense (raw)
  */
-class ECGChart {
+class PPGChart {
   /**
-   * @param {HTMLElement} container - 图表容器
-   * @param {number[]} data - 初始数据
-   * @param {number} height - 图表高度
+   * @param {HTMLElement} container
+   * @param {{ ch0:number, ch1:number, ch2:number, ch3:number }[]} data
+   * @param {number} height
    */
   constructor(container, data, height) {
-    // 提取数据值的函数
-    const extractValues = (dataPoint) => [dataPoint];
+    const extractValues = (dp) => [dp.ch0, dp.ch1, dp.ch2, dp.ch3];
 
-    // 创建监测图表
     this.chart = new MonitorChart(
       container,
       data,
       height,
-      -1000,
-      2000,
-      130, // dataSampleRate
-      "μV", // unit
-      ["#00e676"], // lineColors
-      1.3, // xScale
-      15, // eraseWidth
+      -10000000,  // dataMin – 24-bit signed range (observed values ~5-8M)
+       10000000,  // dataMax
+      55,         // dataSampleRate (Verity Sense PPG @ 55 Hz)
+      "",         // unit (raw ADC counts)
+      ["#ff5252", "#69f0ae", "#40c4ff", "#ffab40"],  // 4 channel colours
+      1.3,        // xScale
+      15,         // eraseWidth
       extractValues
     );
   }
 
+  updateData(data) { this.chart.updateData(data); }
+  destroy()        { this.chart.destroy(); }
+}
+
+/**
+ * Filtered PPG Chart – single channel (processed)
+ * Clears and redraws on each complete window
+ */
+class FilteredPPGChart {
   /**
-   * 更新数据
-   * @param {number[]} data - 新数据
+   * @param {HTMLElement} container
+   * @param {{ v:number }[]} data
+   * @param {number} height
    */
-  updateData(data) {
-    this.chart.updateData(data);
+  constructor(container, data, height) {
+    this.container = container;
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = container.clientWidth;
+    this.canvas.height = height;
+    container.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext("2d");
+    
+    this.data = data;
+    this.height = height;
+    this.dataMin = -3;
+    this.dataMax = 3;
+    this.fs = 55;
+    this.peaks = [];
   }
 
-  /**
-   * 销毁图表
-   */
+  updateData(data, peaks = []) {
+    this.data = data;
+    this.peaks = peaks;
+    this.redraw();
+  }
+
+  redraw() {
+    // Clear canvas
+    this.ctx.fillStyle = "#1a1a1a";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    if (!this.data || this.data.length === 0) return;
+
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const padding = 30;
+    const graphWidth = w - 2 * padding;
+    const graphHeight = h - 2 * padding;
+
+    // Draw grid and axes
+    this.ctx.strokeStyle = "#333";
+    this.ctx.lineWidth = 1;
+    this.ctx.fillStyle = "#999";
+    this.ctx.font = "12px monospace";
+    this.ctx.textAlign = "right";
+
+    for (let i = 0; i <= 4; i++) {
+      const y = padding + (graphHeight * i) / 4;
+      this.ctx.beginPath();
+      this.ctx.moveTo(padding, y);
+      this.ctx.lineTo(w - padding, y);
+      this.ctx.stroke();
+
+      const val = this.dataMax - (i * (this.dataMax - this.dataMin)) / 4;
+      this.ctx.fillText(val.toFixed(1), padding - 5, y + 4);
+    }
+
+    // Draw signal
+    this.ctx.strokeStyle = "#ff5252";
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+
+    for (let i = 0; i < this.data.length; i++) {
+      const val = Math.max(this.dataMin, Math.min(this.dataMax, this.data[i].v));
+      const x = padding + (i / this.data.length) * graphWidth;
+      const y = h - padding - ((val - this.dataMin) / (this.dataMax - this.dataMin)) * graphHeight;
+
+      if (i === 0) {
+        this.ctx.moveTo(x, y);
+      } else {
+        this.ctx.lineTo(x, y);
+      }
+    }
+    this.ctx.stroke();
+
+    // Draw peaks
+    this.ctx.fillStyle = "#ffeb3b";
+    for (const peakIdx of this.peaks) {
+      const x = padding + (peakIdx / this.data.length) * graphWidth;
+      const val = this.data[peakIdx].v;
+      const y = h - padding - ((val - this.dataMin) / (this.dataMax - this.dataMin)) * graphHeight;
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, 4, 0, 2 * Math.PI);
+      this.ctx.fill();
+    }
+
+    // Draw time axis labels
+    this.ctx.textAlign = "center";
+    this.ctx.fillStyle = "#999";
+    const numLabels = 5;
+    for (let i = 0; i <= numLabels; i++) {
+      const x = padding + (i / numLabels) * graphWidth;
+      const sec = (i / numLabels) * (this.data.length / this.fs);
+      this.ctx.fillText(sec.toFixed(1) + "s", x, h - 10);
+    }
+  }
+
+  updateHeight(newHeight) {
+    this.height = newHeight;
+    this.canvas.height = newHeight;
+    this.redraw();
+  }
+
   destroy() {
-    this.chart.destroy();
+    if (this.canvas && this.canvas.parentNode) {
+      this.canvas.parentNode.removeChild(this.canvas);
+    }
   }
 }
 
@@ -427,5 +529,317 @@ class ACCChart {
    */
   destroy() {
     this.chart.destroy();
+  }
+}
+
+/**
+ * Gyroscope chart – 3 axes (X, Y, Z) in deg/s
+ */
+class GyroChart {
+  /**
+   * @param {HTMLElement} container
+   * @param {{ x: number, y: number, z: number }[]} data
+   * @param {number} height
+   */
+  constructor(container, data, height) {
+    const extractValues = (dp) => [dp.x, dp.y, dp.z];
+
+    this.chart = new MonitorChart(
+      container,
+      data,
+      height,
+      -500,     // dataMin (±500 deg/s range for better visibility)
+       500,     // dataMax
+      52,       // dataSampleRate (52 Hz)
+      "°/s",    // unit
+      ["#ea80fc", "#84ffff", "#ccff90"],  // pink, cyan, lime
+      2,        // xScale
+      10,       // eraseWidth
+      extractValues
+    );
+  }
+
+  updateData(data) { this.chart.updateData(data); }
+  destroy()        { this.chart.destroy(); }
+}
+
+/**
+ * Motion Magnitude Chart – shows ACC, GYRO and MAG magnitude over time
+ */
+class MotionMagnitudeChart {
+  constructor(container, data, height) {
+    this.container = container;
+    this.height = height;
+    this.accHistory = [];   // magnitude values
+    this.gyroHistory = [];  // magnitude values
+    this.magHistory = [];   // magnitude values
+    this.maxPoints = 200;
+    this.maxAcc = 2000;     // mg
+    this.maxGyro = 1000;    // deg/s
+    this.maxMag = 100;      // µT (microtesla)
+
+    this.canvas = document.createElement("canvas");
+    this.canvas.style.width = "100%";
+    this.canvas.style.height = `${height}px`;
+    container.style.position = "relative";
+    container.style.width = "100%";
+    container.style.height = `${height}px`;
+    container.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext("2d");
+
+    this._resize();
+    this.resizeObserver = new ResizeObserver(() => this._resize());
+    this.resizeObserver.observe(container);
+    this.animationFrameId = requestAnimationFrame(() => this._draw());
+  }
+
+  _resize() {
+    const dpr = window.devicePixelRatio || 1;
+    this.w = this.canvas.clientWidth;
+    this.h = this.canvas.clientHeight;
+    this.canvas.width = this.w * dpr;
+    this.canvas.height = this.h * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  addAccMagnitude(mag) {
+    this.accHistory.push(mag);
+    if (this.accHistory.length > this.maxPoints) {
+      this.accHistory.shift();
+    }
+  }
+
+  addGyroMagnitude(mag) {
+    this.gyroHistory.push(mag);
+    if (this.gyroHistory.length > this.maxPoints) {
+      this.gyroHistory.shift();
+    }
+  }
+
+  addMagMagnitude(mag) {
+    this.magHistory.push(mag);
+    if (this.magHistory.length > this.maxPoints) {
+      this.magHistory.shift();
+    }
+  }
+
+  _draw() {
+    const ctx = this.ctx;
+    const w = this.w;
+    const h = this.h;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Draw background grid
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = "#666";
+    ctx.font = "11px Arial";
+    ctx.textAlign = "right";
+
+    // Horizontal grid lines with ACC values on left
+    for (let i = 0; i <= 4; i++) {
+      const y = (i / 4) * h;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+
+      // ACC scale (left side)
+      ctx.fillStyle = "#ea80fc";
+      const accVal = Math.round(this.maxAcc * (4 - i) / 4);
+      ctx.fillText(accVal + "mg", 35, y + 4);
+
+      // GYRO scale (right side)
+      ctx.fillStyle = "#84ffff";
+      ctx.textAlign = "left";
+      const gyroVal = Math.round(this.maxGyro * (4 - i) / 4);
+      ctx.fillText(gyroVal + "°/s", w - 35, y + 4);
+      ctx.textAlign = "right";
+    }
+
+    const step = w / (this.maxPoints - 1);
+
+    // Draw ACC magnitude (pink)
+    if (this.accHistory.length > 0) {
+      ctx.beginPath();
+      ctx.strokeStyle = "#ea80fc";
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+
+      const startX = w - (this.accHistory.length - 1) * step;
+      for (let i = 0; i < this.accHistory.length; i++) {
+        const x = startX + i * step;
+        const normalizedY = Math.min(1, this.accHistory[i] / this.maxAcc);
+        const y = h - normalizedY * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Draw GYRO magnitude (cyan)
+    if (this.gyroHistory.length > 0) {
+      ctx.beginPath();
+      ctx.strokeStyle = "#84ffff";
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+
+      const startX = w - (this.gyroHistory.length - 1) * step;
+      for (let i = 0; i < this.gyroHistory.length; i++) {
+        const x = startX + i * step;
+        const normalizedY = Math.min(1, this.gyroHistory[i] / this.maxGyro);
+        const y = h - normalizedY * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Draw MAG magnitude (yellow/gold)
+    if (this.magHistory.length > 0) {
+      ctx.beginPath();
+      ctx.strokeStyle = "#ffd740";
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+
+      const startX = w - (this.magHistory.length - 1) * step;
+      for (let i = 0; i < this.magHistory.length; i++) {
+        const x = startX + i * step;
+        const normalizedY = Math.min(1, this.magHistory[i] / this.maxMag);
+        const y = h - normalizedY * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    this.animationFrameId = requestAnimationFrame(() => this._draw());
+  }
+
+  updateHeight(height) {
+    this.height = height;
+    this.canvas.style.height = `${height}px`;
+    this.container.style.height = `${height}px`;
+    this._resize();
+  }
+
+  destroy() {
+    if (this.resizeObserver) this.resizeObserver.disconnect();
+    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+  }
+}
+
+/**
+ * HR Timeline – heart rate over time as a scrolling line chart
+ * Unlike MonitorChart which sweeps, this uses a simple scrolling window.
+ */
+class HRTimelineChart {
+  constructor(container, height) {
+    this.container = container;
+    this.height = height;
+    this.hrHistory = [];       // {time: Date, bpm: number}
+    this.maxPoints = 300;      // ~5 minutes at 1 sample/sec
+    this.minBPM = 40;
+    this.maxBPM = 200;
+
+    this.canvas = document.createElement("canvas");
+    this.canvas.style.width = "100%";
+    this.canvas.style.height = `${height}px`;
+    container.style.position = "relative";
+    container.style.width = "100%";
+    container.style.height = `${height}px`;
+    container.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext("2d");
+
+    this._resize();
+    this.resizeObserver = new ResizeObserver(() => this._resize());
+    this.resizeObserver.observe(container);
+    this._draw();
+  }
+
+  _resize() {
+    const dpr = window.devicePixelRatio || 1;
+    this.w = this.canvas.clientWidth;
+    this.h = this.canvas.clientHeight;
+    this.canvas.width = this.w * dpr;
+    this.canvas.height = this.h * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  addHR(bpm) {
+    this.hrHistory.push({ time: Date.now(), bpm });
+    if (this.hrHistory.length > this.maxPoints) {
+      this.hrHistory.shift();
+    }
+  }
+
+  _draw() {
+    const ctx = this.ctx;
+    const w = this.w;
+    const h = this.h;
+    const range = this.maxBPM - this.minBPM;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Grid lines
+    ctx.strokeStyle = "#333";
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = "#666";
+    ctx.font = "10px Arial";
+    ctx.textAlign = "left";
+    for (let bpm = 60; bpm <= 180; bpm += 30) {
+      const y = h - ((bpm - this.minBPM) / range) * h;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+      ctx.fillText(`${bpm}`, 4, y - 3);
+    }
+
+    // Draw HR line
+    if (this.hrHistory.length < 2) {
+      requestAnimationFrame(() => this._draw());
+      return;
+    }
+
+    const pts = this.hrHistory;
+    const step = w / (this.maxPoints - 1);
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#ff5252";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+
+    // Offset so latest point is at right edge
+    const startX = w - (pts.length - 1) * step;
+
+    for (let i = 0; i < pts.length; i++) {
+      const x = startX + i * step;
+      const y = h - ((pts[i].bpm - this.minBPM) / range) * h;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill under curve
+    ctx.lineTo(startX + (pts.length - 1) * step, h);
+    ctx.lineTo(startX, h);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(255, 82, 82, 0.08)";
+    ctx.fill();
+
+    requestAnimationFrame(() => this._draw());
+  }
+
+  updateHeight(height) {
+    this.height = height;
+    this.canvas.style.height = `${height}px`;
+    this.container.style.height = `${height}px`;
+    this._resize();
+  }
+
+  destroy() {
+    if (this.resizeObserver) this.resizeObserver.disconnect();
   }
 }
