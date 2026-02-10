@@ -1,12 +1,12 @@
-# polar-display
-
-Real-time biometric dashboard for **Polar Verity Sense** optical heart rate sensor. Streams PPG (photoplethysmography), accelerometer, gyroscope, and heart rate data via WebSocket to an interactive web interface with live signal processing and BPM estimation.
-
+# Polar Variety Sense Python to Dashboard Streaming 
 ![Dashboard](https://img.shields.io/badge/Python-3.14-blue.svg) ![License](https://img.shields.io/badge/license-MIT-green.svg)
+
+A biometric dashboard for the **Polar Verity Sense** optical heart rate sensor. 
+The dashboard provide a graphed estimate of heart rate (BPM) from PPG (photoplethysmography) data from the sensor, along with accelerometer (ACC), gyroscope (GYRO), and magnetometer (MAG). 
 
 ## Demo
 
-https://github.com/user-attachments/assets/bf3000d3-d294-4421-9aee-70d0376f0888
+https://github.com/user-attachments/assets/f9aabd8c-4b09-4937-9191-349dac8b1524
 
 ## Installation
 
