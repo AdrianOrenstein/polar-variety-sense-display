@@ -1,4 +1,4 @@
-# Polar Variety Sense Python to Dashboard Streaming 
+# Polar Varity Sense Python to Dashboard Streaming 
 ![Dashboard](https://img.shields.io/badge/Python-3.14-blue.svg) ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 A biometric dashboard for the **Polar Verity Sense** optical heart rate sensor. 
